@@ -1,0 +1,30 @@
+# fly.toml — Fly.io deployment config for FeedbackBot
+
+app = "feedbackbot"  # You will change this to your chosen app name
+primary_region = "sin"  # Singapore — closest to Uzbekistan with good latency
+
+[build]
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false   # CRITICAL — never sleep
+  auto_start_machines = true
+  min_machines_running = 1     # always keep 1 machine alive
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 80
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "feedbackbot_data"
+  destination = "/data"        # SQLite DB stored here — persists forever

@@ -32,7 +32,7 @@ BUILDER_TOKEN   = os.environ["BUILDER_BOT_TOKEN"]       # Your main bot token
 WEBHOOK_SECRET  = os.environ["WEBHOOK_SECRET"]           # Random secret string
 FERNET_KEY      = os.environ["FERNET_KEY"]               # Encrypt stored tokens
 PUBLIC_URL      = os.environ["PUBLIC_URL"].rstrip("/")   # e.g. https://xyz.up.railway.app
-DATABASE_URL    = os.environ.get("DATABASE_URL", "sqlite:///./feedbackbot.db")
+DATABASE_URL    = os.environ.get("DATABASE_URL", "sqlite:////data/feedbackbot.db")
 
 fernet = Fernet(FERNET_KEY.encode())
 
