@@ -1,5 +1,5 @@
 """
-Run this once locally to generate your FERNET_KEY and WEBHOOK_SECRET.
+ Run this once locally to generate your FERNET_KEY and WEBHOOK_SECRET.
 Copy the output into Railway environment variables.
 
 Usage:
