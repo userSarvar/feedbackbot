@@ -328,26 +328,13 @@ async def handle_child_update(bot_username: str, update: dict):
             db.add(thread)
             db.flush()
 
-        # Forward visitor's message to owner with a header
-        header = (
-            f"💬 <b>Message from</b> {visitor_name}"
-            + (f" (@{visitor_username})" if visitor_username else "")
-            + f"\n<code>ID: {visitor_id}</code>\n"
-            + "─" * 20
-        )
-        header_msg = await send_message(token, owner_id, header)
+        # Forward visitor's message to owner — clean "Forwarded from" style, no header
+        forwarded = await forward_message(token, owner_id, visitor_id, message_id)
 
-        # Copy the actual message (preserves media, stickers, etc.)
-        copied = await copy_message(token, owner_id, visitor_id, message_id)
-
-        if copied.get("ok"):
-            thread.last_msg_id = copied["result"]["message_id"]
+        if forwarded.get("ok"):
+            thread.last_msg_id = forwarded["result"]["message_id"]
 
         db.commit()
-
-        # Confirm to visitor
-        await tg(token, "sendChatAction", chat_id=visitor_id, action="typing")
-        await send_message(token, visitor_id, "✅ Your message was delivered!")
 
     finally:
         db.close()
