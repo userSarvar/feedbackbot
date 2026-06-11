@@ -49,14 +49,21 @@ class RegisteredBot(Base):
     active        = Column(Boolean, default=True)
 
 class ConversationThread(Base):
-    """Maps visitor chat_id → a stable thread message_id in owner's chat."""
+    """Maps visitor chat_id → thread info."""
     __tablename__ = "threads"
     id            = Column(Integer, primary_key=True)
     bot_username  = Column(String, index=True)
     visitor_id    = Column(String)
     visitor_name  = Column(String)
-    # We keep the last message_id so owner can reply-to it
     last_msg_id   = Column(Integer, default=0)
+
+class MessageMap(Base):
+    """Maps every forwarded message_id in owner's chat → visitor_id."""
+    __tablename__ = "message_map"
+    id            = Column(Integer, primary_key=True)
+    bot_username  = Column(String, index=True)
+    owner_msg_id  = Column(Integer, index=True)  # message_id in owner's chat
+    visitor_id    = Column(String)
 
 # SQLite fix for Railway (DATABASE_URL may start with postgres://)
 if DATABASE_URL.startswith("postgres://"):
@@ -332,7 +339,14 @@ async def handle_child_update(bot_username: str, update: dict):
         forwarded = await forward_message(token, owner_id, visitor_id, message_id)
 
         if forwarded.get("ok"):
-            thread.last_msg_id = forwarded["result"]["message_id"]
+            fwd_msg_id = forwarded["result"]["message_id"]
+            thread.last_msg_id = fwd_msg_id
+            # Store every forwarded message so owner can reply to any of them
+            db.add(MessageMap(
+                bot_username=bot_username,
+                owner_msg_id=fwd_msg_id,
+                visitor_id=visitor_id,
+            ))
 
         db.commit()
 
@@ -361,19 +375,21 @@ async def handle_owner_reply(bot_username: str, update: dict):
 
         token = decrypt_token(bot_rec.token_enc)
 
-        # Find the thread by matching last_msg_id or the replied-to message
+        # Look up visitor from MessageMap — works for ANY forwarded message, not just the last one
         replied_msg_id = reply_to["message_id"]
-        thread = db.query(ConversationThread).filter(
-            ConversationThread.bot_username == bot_username,
-            ConversationThread.last_msg_id  == replied_msg_id,
+        msg_map = db.query(MessageMap).filter_by(
+            bot_username=bot_username,
+            owner_msg_id=replied_msg_id,
         ).first()
 
-        if not thread:
+        if not msg_map:
             await send_message(token, owner_id, "⚠️ Could not find the visitor for this message. Make sure you reply directly to a forwarded message.")
             return
 
+        visitor_id = msg_map.visitor_id
+
         # Copy owner reply to visitor (preserves media)
-        result = await copy_message(token, thread.visitor_id, owner_id, message_id)
+        result = await copy_message(token, visitor_id, owner_id, message_id)
         if result.get("ok"):
             await tg(token, "setMessageReaction", chat_id=owner_id, message_id=message_id, reaction=[{"type": "emoji", "emoji": "✅"}])
         else:
